@@ -191,3 +191,54 @@ fn exactly_threshold_shares_are_not_an_authenticity_check() {
     shares[1] = Share::from_parts(2, changed).unwrap();
     assert_ne!(*reconstruct(2, &shares).unwrap(), secret);
 }
+
+// Independent polynomial long division, used only by the integration oracle.
+fn reference_product(a: u8, b: u8) -> u8 {
+    let mut product = 0u16;
+    for bit in 0..8 {
+        if (b >> bit) & 1 != 0 {
+            product ^= u16::from(a) << bit;
+        }
+    }
+    for bit in (8..=14).rev() {
+        if (product >> bit) & 1 != 0 {
+            product ^= 0x11b << (bit - 8);
+        }
+    }
+    product as u8
+}
+
+#[test]
+fn independently_evaluated_polynomials_recover_at_nonconsecutive_coordinates() {
+    // This exercises validation, share-to-column wiring, surplus checks, and
+    // general thresholds outside the bytewise root theorem's coordinates 1, 2.
+    let coordinates = [255u8, 17, 1, 127, 64, 3];
+    let secret = core::array::from_fn(|byte| (byte as u8).wrapping_mul(29));
+    for threshold in 1..=5u8 {
+        let shares: Vec<Share> = coordinates
+            .iter()
+            .map(|&index| {
+                let value = core::array::from_fn(|byte| {
+                    let mut value = secret[byte];
+                    let mut power = 1u8;
+                    for degree in 1..threshold {
+                        power = reference_product(power, index);
+                        let coefficient = (byte as u8).wrapping_mul(71).wrapping_add(degree);
+                        value ^= reference_product(coefficient, power);
+                    }
+                    value
+                });
+                Share::from_parts(index, Zeroizing::new(value)).unwrap()
+            })
+            .collect();
+        for rotation in 0..shares.len() {
+            let mut reordered: Vec<Share> = shares.iter().map(fixture_copy).collect();
+            reordered.rotate_left(rotation);
+            assert_eq!(*reconstruct(threshold, &reordered).unwrap(), secret);
+            assert_eq!(
+                *reconstruct(threshold, &reordered[..usize::from(threshold)]).unwrap(),
+                secret
+            );
+        }
+    }
+}

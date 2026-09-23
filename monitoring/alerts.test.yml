@@ -1,0 +1,74 @@
+rule_files:
+  - alerts.yml
+evaluation_interval: 1m
+tests:
+  - name: fresh_failure_pages_but_old_success_becomes_stale
+    interval: 1m
+    input_series:
+      - series: 'leelo_probe_success{instance="failed",target="1"}'
+        values: '0 0 0 0 0'
+      - series: 'leelo_probe_last_attempt_timestamp_seconds{instance="failed",target="1"}'
+        values: '0 60 120 180 240'
+      - series: 'leelo_probe_success{instance="stale",target="1"}'
+        values: '1 1 1 1 1'
+      - series: 'leelo_probe_last_attempt_timestamp_seconds{instance="stale",target="1"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: LeeloEvaluationUnavailable
+        exp_alerts:
+          - exp_labels: {instance: failed, target: '1', severity: critical}
+            exp_annotations:
+              summary: A configured evaluator fails valid evaluation probes.
+              description: Check the probe outcome, service state, client network, public pin, and recent changes. Follow docs/observability.md.
+      - eval_time: 4m
+        alertname: LeeloProbeStale
+        exp_alerts:
+          - exp_labels: {instance: stale, target: '1', severity: warning}
+            exp_annotations:
+              summary: A Leelo probe has no recent result.
+              description: Health is unknown. Check the probe timer, textfile writer, collector, and clock.
+  - name: expected_missing_series_stays_visible
+    interval: 1m
+    input_series:
+      - series: 'leelo_expected_probe{instance="missing",target="1"}'
+        values: '1 1 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: LeeloProbeMissing
+        exp_alerts:
+          - exp_labels: {instance: missing, target: '1', severity: warning}
+            exp_annotations:
+              summary: An expected Leelo probe series is missing.
+              description: Restore collection or correct the external expected-target inventory. Do not remove a failed target to clear this alert.
+  - name: old_qualification_does_not_age_a_young_incomplete_enrollment
+    interval: 1m
+    input_series:
+      - series: 'leelo_enrollments_requiring_reconciliation{instance="mixed"}'
+        values: '0+0x59 1+0x70'
+      - series: 'leelo_oldest_enrollment_requiring_reconciliation_timestamp_seconds{instance="mixed"}'
+        values: '0+0x59 3600+0x70'
+      - series: 'leelo_oldest_unresolved_enrollment_timestamp_seconds{instance="mixed"}'
+        values: '0+0x130'
+      - series: 'leelo_enrollments_awaiting_boot_test{instance="mixed"}'
+        values: '1+0x130'
+      - series: 'leelo_oldest_enrollment_awaiting_boot_test_timestamp_seconds{instance="mixed"}'
+        values: '0+0x130'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: LeeloEnrollmentNeedsReconciliation
+        exp_alerts: []
+      - eval_time: 70m
+        alertname: LeeloEnrollmentBootTestOverdue
+        exp_alerts:
+          - exp_labels: {instance: mixed, severity: warning}
+            exp_annotations:
+              summary: A committed enrollment still needs its production boot test.
+              description: Perform the approved boot qualification and update the trusted inventory. A local credential test is not production boot evidence.
+      - eval_time: 130m
+        alertname: LeeloEnrollmentNeedsReconciliation
+        exp_alerts:
+          - exp_labels: {instance: mixed, severity: warning}
+            exp_annotations:
+              summary: An enrollment journal remains incomplete for over one hour.
+              description: Inspect the pending bundle and exact slot through the supported recovery workflow. Retain recovery credentials and do not delete slots automatically.

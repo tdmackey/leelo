@@ -1,23 +1,32 @@
 use leelo_crypto::{Evaluation, SecretServer, SecretSigningKey};
-use leelo_engine::{Error, NetworkProvider, TpmAuthorization, TpmProvider, UnsealedSeed};
+use leelo_engine::{
+    Error, NetworkFailure, NetworkProvider, TpmAuthorization, TpmProvider, UnsealedSeed,
+};
 use leelo_envelope::{AuthenticatedEnvelope, Descriptor, NetworkBinding, TpmBlob};
 use leelo_policy::{Mode, NetworkNode, ProductionPolicy};
+use std::cell::Cell;
+use std::time::Instant;
 use zeroize::Zeroizing;
 
 struct TestNetwork {
     keys: Vec<SecretServer>,
     offline: Vec<u8>,
-    calls: usize,
+    calls: Cell<usize>,
 }
 impl NetworkProvider for TestNetwork {
-    fn evaluate(&mut self, b: &NetworkBinding, blinded: &[u8; 49]) -> Result<Evaluation, Error> {
-        self.calls += 1;
+    async fn evaluate(
+        &self,
+        b: &NetworkBinding,
+        blinded: &[u8; 49],
+        _: Instant,
+    ) -> Result<Evaluation, NetworkFailure> {
+        self.calls.set(self.calls.get() + 1);
         if self.offline.contains(&b.node_id) {
-            return Err(Error::Provider("test offline"));
+            return Err(NetworkFailure::Unavailable);
         }
         self.keys[(b.node_id - 2) as usize]
             .evaluate(blinded)
-            .map_err(|_| Error::Crypto)
+            .map_err(|_| NetworkFailure::Cryptography)
     }
 }
 /// This test double is synthetic. Production code does not export a software-TPM fallback.
@@ -96,7 +105,7 @@ fn fixture(mode: Mode, required: u8) -> (Descriptor, SecretSigningKey, TestNetwo
         .map(|(i, k)| NetworkBinding {
             node_id: (i + 2) as u8,
             provider_id: [(i + 2) as u8; 32],
-            key_id: [(i + 12) as u8; 32],
+            key_id: leelo_protocol::key_id(k.public_key().as_bytes()),
             public_key: *k.public_key().as_bytes(),
             input_seed: [(i + 22) as u8; 32],
         })
@@ -116,7 +125,7 @@ fn fixture(mode: Mode, required: u8) -> (Descriptor, SecretSigningKey, TestNetwo
         TestNetwork {
             keys,
             offline: vec![],
-            calls: 0,
+            calls: Cell::new(0),
         },
         TestTpm {
             wrapping_key: Zeroizing::new([46; 32]),
@@ -143,7 +152,7 @@ fn either_network_but_always_tpm() {
             &mut tpm,
         )
         .unwrap();
-        assert_eq!(*key, *prepared.credential);
+        assert_eq!(*key.credential, *prepared.credential);
     }
     net.offline = vec![2, 3];
     assert!(
@@ -234,7 +243,7 @@ fn attested_requires_live_adapter_evidence() {
 fn unsupported_mode_rejects_before_provider_io() {
     let (desc, signer, mut net, mut tpm) = fixture(Mode::Attested, 1);
     let prepared = leelo_engine::prepare(desc.clone(), &signer, &mut net, &mut tpm).unwrap();
-    net.calls = 0;
+    net.calls.set(0);
     tpm.calls = 0;
     tpm.supports_attested = false;
     assert!(matches!(
@@ -252,7 +261,7 @@ fn unsupported_mode_rejects_before_provider_io() {
         leelo_engine::prepare(desc, &signer, &mut net, &mut tpm),
         Err(Error::UnsupportedMode)
     ));
-    assert_eq!(net.calls, 0);
+    assert_eq!(net.calls.get(), 0);
     assert_eq!(tpm.calls, 0);
 }
 
@@ -260,7 +269,7 @@ fn unsupported_mode_rejects_before_provider_io() {
 fn every_byte_tamper_and_wrong_target_reject_before_provider_io() {
     let (desc, signer, mut net, mut tpm) = fixture(Mode::NetworkBound, 1);
     let prepared = leelo_engine::prepare(desc, &signer, &mut net, &mut tpm).unwrap();
-    net.calls = 0;
+    net.calls.set(0);
     tpm.calls = 0;
     for i in 0..prepared.envelope.len() {
         let mut modified = prepared.envelope.clone();
@@ -302,7 +311,7 @@ fn every_byte_tamper_and_wrong_target_reject_before_provider_io() {
         )
         .is_err()
     );
-    assert_eq!((net.calls, tpm.calls), (0, 0));
+    assert_eq!((net.calls.get(), tpm.calls), (0, 0));
 }
 
 #[test]

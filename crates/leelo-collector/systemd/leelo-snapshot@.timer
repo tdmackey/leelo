@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect Leelo %i metrics at bounded intervals
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=10s
+RandomizedDelaySec=2s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

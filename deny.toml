@@ -1,0 +1,47 @@
+# Use the locked workspace graph, including test/build dependencies, on supported hosts.
+[graph]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+
+[advisories]
+db-urls = ["https://github.com/RustSec/advisory-db"]
+yanked = "deny"
+unmaintained = "all"
+unused-ignored-advisory = "deny"
+# No vulnerability, unsoundness, unmaintained, or yanked-package exceptions.
+ignore = []
+
+[licenses]
+include-dev = true
+confidence-threshold = 0.95
+allow = ["Apache-2.0", "BSD-3-Clause", "ISC", "MIT", "Unicode-3.0", "Zlib"]
+unused-allowed-license = "warn"
+exceptions = [
+    # Existing CBOR codec; its published LICENSE is Blue Oak Model License 1.0.0.
+    { name = "minicbor", version = "=0.26.5", allow = ["BlueOak-1.0.0"] },
+    # TPM FFI build dependency; the published LICENSE includes the LLVM exception.
+    { name = "target-lexicon", version = "=0.12.16", allow = ["Apache-2.0 WITH LLVM-exception"] },
+    # TLS trust-root data; published LICENSE is CDLA-Permissive-2.0.
+    { name = "webpki-roots", version = "=1.0.9", allow = ["CDLA-Permissive-2.0"] },
+    # Isolated fuzz runner: manifest/README declare NCSA; bundled C++ headers
+    # identify Apache-2.0 WITH LLVM-exception. See docs/dependency-policy.md.
+    { name = "libfuzzer-sys", version = "=0.4.13", allow = ["NCSA", "Apache-2.0 WITH LLVM-exception"] },
+]
+
+[bans]
+# Version duplication is visible for review; replacing incompatible dependency
+# generations merely to deduplicate would require unrelated API migrations.
+multiple-versions = "warn"
+# Internal path dependencies intentionally omit a registry version. The policy
+# script separately rejects unconstrained registry or Git requirements.
+wildcards = "allow"
+
+[[bans.features]]
+name = "voprf"
+version = "=0.5.0"
+deny = ["danger", "default", "serde", "ristretto255", "ristretto255-ciphersuite"]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -64,7 +64,6 @@ proof fn reduction_matches_long_division(value: u16) {
     ;
 }
 
-#[verifier::inline]
 pub open spec fn product_spec(a: u8, b: u8) -> u8 {
     polynomial_reduce(carryless_product(a, b))
 }
@@ -147,11 +146,55 @@ pub(crate) fn mul(a: u8, b: u8) -> (result: u8)
     product
 }
 
-/// Compute a^-1 = a^254. The caller must establish that a is nonzero.
+pub closed spec fn inverse_spec(a: u8) -> u8 {
+    let a2 = product_spec(a, a);
+    let a4 = product_spec(a2, a2);
+    let a8 = product_spec(a4, a4);
+    let a16 = product_spec(a8, a8);
+    let a32 = product_spec(a16, a16);
+    let a64 = product_spec(a32, a32);
+    let a128 = product_spec(a64, a64);
+    product_spec(product_spec(product_spec(a2, a4), product_spec(a8, a16)),
+        product_spec(a32, product_spec(a64, a128)))
+}
+
+pub proof fn inverse_identity(a: u8)
+    requires a != 0,
+    ensures product_spec(a, inverse_spec(a)) == 1,
+{
+    let a2 = product_spec(a, a);
+    let a4 = product_spec(a2, a2);
+    let a8 = product_spec(a4, a4);
+    let a16 = product_spec(a8, a8);
+    let a32 = product_spec(a16, a16);
+    let a64 = product_spec(a32, a32);
+    let a128 = product_spec(a64, a64);
+    let a6 = product_spec(a2, a4);
+    let a24 = product_spec(a8, a16);
+    let a192 = product_spec(a64, a128);
+    let a224 = product_spec(a32, a192);
+    let a30 = product_spec(a6, a24);
+    let result = product_spec(a30, a224);
+    assert(product_spec(a, result) == 1) by (bit_vector)
+        requires
+            a != 0,
+            a2 == product_spec(a, a), a4 == product_spec(a2, a2),
+            a8 == product_spec(a4, a4), a16 == product_spec(a8, a8),
+            a32 == product_spec(a16, a16), a64 == product_spec(a32, a32),
+            a128 == product_spec(a64, a64), a6 == product_spec(a2, a4),
+            a24 == product_spec(a8, a16), a192 == product_spec(a64, a128),
+            a224 == product_spec(a32, a192), a30 == product_spec(a6, a24),
+            result == product_spec(a30, a224),
+    ;
+}
+
+/// Compute a^-1 = a^254. The verifier proves the nonzero inverse identity.
 ///
 /// This function returns zero for a=0. That value is not a field inverse.
 /// Public coordinate validation establishes the nonzero precondition in the interpolation caller.
-pub(crate) fn inverse_nonzero(a: u8) -> u8 {
+pub(crate) fn inverse_nonzero(a: u8) -> (result: u8)
+    ensures result == inverse_spec(a), a != 0 ==> product_spec(a, result) == 1,
+{
     let a2 = mul(a, a);
     let a4 = mul(a2, a2);
     let a8 = mul(a4, a4);
@@ -159,7 +202,9 @@ pub(crate) fn inverse_nonzero(a: u8) -> u8 {
     let a32 = mul(a16, a16);
     let a64 = mul(a32, a32);
     let a128 = mul(a64, a64);
-    mul(mul(mul(a2, a4), mul(a8, a16)), mul(a32, mul(a64, a128)))
+    let result = mul(mul(mul(a2, a4), mul(a8, a16)), mul(a32, mul(a64, a128)));
+    proof { if a != 0 { inverse_identity(a); } }
+    result
 }
 
 }

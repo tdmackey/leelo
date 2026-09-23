@@ -29,7 +29,8 @@ Write-Output $versionOutput
 # Reject local proof bypasses. Standard-library contracts remain part of the trusted computing base.
 $proofSources = @(
     (Join-Path $leeloRoot 'verification/policy.rs'),
-    (Join-Path $leeloRoot 'crates/leelo-policy/src/verified.rs')
+    (Join-Path $leeloRoot 'crates/leelo-policy/src/verified.rs'),
+    (Join-Path $leeloRoot 'crates/leelo-policy/src/verified_compile.rs')
 )
 $bypass = Select-String -LiteralPath $proofSources -Pattern '\b(assume|admit)\s*\(|external_body|assume_specification|verifier::external'
 if ($bypass) { throw "Unreviewed proof bypass found: $bypass" }

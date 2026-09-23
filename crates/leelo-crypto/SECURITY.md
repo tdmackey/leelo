@@ -46,12 +46,25 @@ Known qualification requirements and limits:
 - voprf 0.5.0 rejects zero scalar encodings, including proof scalars.
   RFC 9497 permits zero proof scalars. The library can reject an extremely rare valid proof.
   This interoperability restriction fails closed. The implementation does not fully conform to RFC 9497.
-- The upstream blind/evaluate API requires an infallible CryptoRng.
-  OsRng panics if OS entropy fails during those calls. The operation stops with no weak fallback.
-  Other randomness calls return an error.
+- The upstream blind/evaluate API requires an infallible CryptoRng. Each Leelo
+  call first obtains a fresh 256-bit OS seed using `try_fill_bytes`; failure
+  returns `Error::Randomness` before calling the upstream operation. A private
+  adapter supplies the standard 20-round RustCrypto ChaCha20 stream to that
+  one operation. The fixed zero nonce is safe only because no seed/stream is
+  reused between operations. There is no deterministic production API, shared
+  RNG, entropy fallback, or retry after a seed failure.
+- The seed buffer and zeroize-enabled cipher state/output buffer are erased on
+  drop. This does not prove erasure of compiler copies, registers, or dependency
+  temporaries. ChaCha20 has a finite 32-bit block counter; the cipher rejects
+  exhaustion before wrapping (less than 256 GiB of output for an operation).
+  Upstream scalar sampling uses tiny draws but has an unbounded rejection loop.
+  The infallible bridge therefore still panics on stream exhaustion or other
+  upstream invariant failures. It does not catch arbitrary library panics.
 - RFC 9497 documents static-DH query-oracle security limits. Server request
   budgets and lifecycle policy remain outside this primitive wrapper.
 
 References: [RFC 9497](https://www.rfc-editor.org/rfc/rfc9497.html),
 [voprf 0.5.0](https://docs.rs/voprf/0.5.0/voprf/),
 [p384 security notice](https://docs.rs/p384/0.13.1/p384/).
+The private random-stream adapter is checked against the
+[RFC 8439 ChaCha20 block vector](https://www.rfc-editor.org/rfc/rfc8439.html#section-2.3.2).

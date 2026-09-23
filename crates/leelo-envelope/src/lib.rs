@@ -280,17 +280,6 @@ fn read_descriptor(raw: &[u8]) -> Result<Descriptor, Error> {
     Ok(desc)
 }
 
-fn collect_leaves(n: &NetworkNode, leaves: &mut Vec<(u8, [u8; 32])>) {
-    match n {
-        NetworkNode::Leaf { id, provider_id } => leaves.push((*id, *provider_id)),
-        NetworkNode::Threshold { children, .. } => {
-            for n in children {
-                collect_leaves(n, leaves);
-            }
-        }
-    }
-}
-
 fn validate_descriptor(d: &Descriptor) -> Result<(), Error> {
     if d.slot >= 32
         || d.generation == 0
@@ -301,13 +290,15 @@ fn validate_descriptor(d: &Descriptor) -> Result<(), Error> {
     {
         return Err(Error::InvalidPolicy);
     }
-    let mut leaves = Vec::new();
-    collect_leaves(d.policy.network(), &mut leaves);
+    let leaves = d.policy.network_leaves();
     if leaves.len() != d.networks.len() {
         return Err(Error::InvalidProvider);
     }
     for ((id, provider_id), binding) in leaves.iter().zip(&d.networks) {
-        if *id != binding.node_id || *provider_id != binding.provider_id {
+        if *id != binding.node_id
+            || *provider_id != binding.provider_id
+            || binding.key_id != leelo_protocol::key_id(&binding.public_key)
+        {
             return Err(Error::InvalidProvider);
         }
         leelo_crypto::ServerPublicKey::from_bytes(binding.public_key)
@@ -495,4 +486,71 @@ pub fn authenticate(raw: &[u8], trusted_key: &[u8; 32]) -> Result<AuthenticatedE
     let body = read_body(raw_body)?;
     let context = context_hash(&body.descriptor)?;
     Ok(AuthenticatedEnvelope { body, context })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn descriptor() -> Descriptor {
+        let mut networks = Vec::new();
+        let mut children = Vec::new();
+        for id in [3, 4] {
+            let server = leelo_crypto::SecretServer::from_secret_bytes(&[id; 48]).unwrap();
+            let public_key = *server.public_key().as_bytes();
+            children.push(NetworkNode::Leaf {
+                id,
+                provider_id: [id; 32],
+            });
+            networks.push(NetworkBinding {
+                node_id: id,
+                provider_id: [id; 32],
+                key_id: leelo_protocol::key_id(&public_key),
+                public_key,
+                input_seed: [id + 10; 32],
+            });
+        }
+        Descriptor {
+            binding_id: [1; 32],
+            volume_uuid: [2; 16],
+            slot: 1,
+            generation: 1,
+            policy: ProductionPolicy::new(
+                Mode::NetworkBound,
+                1,
+                NetworkNode::Threshold {
+                    id: 2,
+                    required: 1,
+                    children,
+                },
+            )
+            .unwrap(),
+            networks,
+            tpm_pcr_mask: 1 << 7,
+            tpm_pcr_digest: [0; 32],
+        }
+    }
+
+    #[test]
+    fn descriptor_rejects_a_key_id_that_does_not_match_the_public_key() {
+        let mut descriptor = descriptor();
+        assert!(descriptor_bytes(&descriptor).is_ok());
+        descriptor.networks[1].key_id[0] ^= 1;
+        assert_eq!(descriptor_bytes(&descriptor), Err(Error::InvalidProvider));
+        assert_eq!(context_hash(&descriptor), Err(Error::InvalidProvider));
+    }
+
+    #[test]
+    fn descriptor_bindings_follow_the_policy_leaf_order() {
+        let mut descriptor = descriptor();
+        let encoded = descriptor_bytes(&descriptor).unwrap();
+        let decoded = read_descriptor(&encoded).unwrap();
+        assert_eq!(
+            decoded.policy.network_leaves(),
+            &[(3, [3; 32]), (4, [4; 32])]
+        );
+        assert_eq!(decoded.networks, descriptor.networks);
+        descriptor.networks.swap(0, 1);
+        assert_eq!(descriptor_bytes(&descriptor), Err(Error::InvalidProvider));
+    }
 }

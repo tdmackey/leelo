@@ -18,6 +18,7 @@ sha2 = "0.10"
 
 [dev-dependencies]
 leelo-crypto = { path = "../leelo-crypto" }
+leelo-protocol = { path = "../leelo-protocol" }
 
 [lints.rust]
 unsafe_code = "forbid"

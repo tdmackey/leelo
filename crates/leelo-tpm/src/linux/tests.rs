@@ -1,14 +1,21 @@
 use super::*;
 use leelo_crypto::{Evaluation, SecretServer, SecretSigningKey};
-use leelo_engine::NetworkProvider;
+use leelo_engine::{NetworkFailure, NetworkProvider};
 use leelo_envelope::{NetworkBinding, authenticate, sign};
 use leelo_policy::{NetworkNode, ProductionPolicy};
 use tss_esapi::{handles::PcrHandle, structures::DigestValues};
 
 struct LocalNetwork(SecretServer);
 impl NetworkProvider for LocalNetwork {
-    fn evaluate(&mut self, _: &NetworkBinding, blinded: &[u8; 49]) -> Result<Evaluation, Error> {
-        self.0.evaluate(blinded).map_err(|_| Error::Crypto)
+    async fn evaluate(
+        &self,
+        _: &NetworkBinding,
+        blinded: &[u8; 49],
+        _: std::time::Instant,
+    ) -> Result<Evaluation, NetworkFailure> {
+        self.0
+            .evaluate(blinded)
+            .map_err(|_| NetworkFailure::Cryptography)
     }
 }
 
@@ -53,7 +60,7 @@ fn swtpm_real_sealing_engine_unlock_and_negative_policies() {
         networks: vec![NetworkBinding {
             node_id: 2,
             provider_id: [13; 32],
-            key_id: [14; 32],
+            key_id: leelo_protocol::key_id(network.0.public_key().as_bytes()),
             public_key: *network.0.public_key().as_bytes(),
             input_seed: [15; 32],
         }],
@@ -76,7 +83,7 @@ fn swtpm_real_sealing_engine_unlock_and_negative_policies() {
         &mut provider,
     )
     .expect("encrypted response and engine reconstruction");
-    assert!(credential.as_ref() == enrollment.credential.as_ref());
+    assert!(credential.credential.as_ref() == enrollment.credential.as_ref());
     let envelope = authenticate(&enrollment.envelope, &signer.public_key()).unwrap();
 
     // The TPM itself rejects password-only authorization to the sealed object.

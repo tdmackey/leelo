@@ -1,0 +1,19 @@
+name: Locked dependency policy
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '24 7 * * 1'
+permissions:
+  contents: read
+jobs:
+  dependencies:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - name: Install the pinned policy checker
+        run: cargo install cargo-deny --version 0.19.4 --locked
+      - name: Check production and enabled fuzz graphs against current advisories and policy
+        run: python3 scripts/check-dependencies.py

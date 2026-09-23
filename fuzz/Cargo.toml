@@ -1,0 +1,67 @@
+[package]
+name = "leelo-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+members = ["."]
+
+[features]
+fuzzing = ["dep:libfuzzer-sys"]
+
+[dependencies]
+leelo-crypto = { path = "../crates/leelo-crypto" }
+leelo-envelope = { path = "../crates/leelo-envelope" }
+leelo-luks = { path = "../crates/leelo-luks" }
+leelo-policy = { path = "../crates/leelo-policy" }
+leelo-protocol = { path = "../crates/leelo-protocol" }
+libfuzzer-sys = { version = "0.4", optional = true }
+minicbor = { version = "0.26", features = ["std"] }
+p384 = { version = "0.13.1", default-features = false, features = ["hash2curve", "voprf"] }
+voprf = { version = "=0.5.0", default-features = false }
+
+[[bin]]
+name = "envelope"
+path = "fuzz_targets/envelope.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "wire"
+path = "fuzz_targets/wire.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "crypto_encodings"
+path = "fuzz_targets/crypto_encodings.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "luks_token"
+path = "fuzz_targets/luks_token.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "policy"
+path = "fuzz_targets/policy.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]

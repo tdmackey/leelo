@@ -39,20 +39,23 @@ pub struct Tpm2Provider {
     tcti: TctiNameConf,
 }
 
-fn tss_error(_: tss_esapi::Error) -> Error {
+fn tss_error(operation: &'static str, error: tss_esapi::Error) -> Error {
     // Diagnostics contain no library objects, command parameters, or secret buffers.
-    Error::Provider("TPM2-TSS operation failed")
+    Error::Tpm {
+        operation,
+        detail: format!("{error:?}"),
+    }
 }
 
 impl Tpm2Provider {
     /// Parse trusted transport configuration without issuing a TPM command.
     pub fn new(tcti: &str) -> Result<Self, Error> {
-        let tcti = TctiNameConf::from_str(tcti).map_err(tss_error)?;
+        let tcti = TctiNameConf::from_str(tcti).map_err(|error| tss_error("new", error))?;
         Ok(Self { tcti })
     }
 
     fn context(&self) -> Result<Context, Error> {
-        Context::new(self.tcti.clone()).map_err(tss_error)
+        Context::new(self.tcti.clone()).map_err(|error| tss_error("context", error))
     }
 
     /// Hash the selected SHA-256 PCR values in increasing PCR-index order.
@@ -70,8 +73,9 @@ impl Tpm2Provider {
                 continue;
             }
             let selected = selection(1 << index)?;
-            let (current, returned, digests) =
-                context.pcr_read(selected.clone()).map_err(tss_error)?;
+            let (current, returned, digests) = context
+                .pcr_read(selected.clone())
+                .map_err(|error| tss_error("pcr_digest", error))?;
             if returned != selected
                 || digests.value().len() != 1
                 || digests.value()[0].value().len() != 32
@@ -104,9 +108,12 @@ fn selection(mask: u32) -> Result<PcrSelectionList, Error> {
         .map(|index| PcrSlot::try_from(1_u32 << index))
         .collect();
     PcrSelectionListBuilder::new()
-        .with_selection(HashingAlgorithm::Sha256, &slots.map_err(tss_error)?)
+        .with_selection(
+            HashingAlgorithm::Sha256,
+            &slots.map_err(|error| tss_error("selection", error))?,
+        )
         .build()
-        .map_err(tss_error)
+        .map_err(|error| tss_error("selection", error))
 }
 
 fn sealed_attributes() -> Result<ObjectAttributes, Error> {
@@ -121,7 +128,7 @@ fn sealed_attributes() -> Result<ObjectAttributes, Error> {
         .with_decrypt(false)
         .with_sign_encrypt(false)
         .build()
-        .map_err(tss_error)
+        .map_err(|error| tss_error("sealed_attributes", error))
 }
 
 fn sealed_public(policy: Digest) -> Result<Public, Error> {
@@ -133,7 +140,7 @@ fn sealed_public(policy: Digest) -> Result<Public, Error> {
         .with_keyed_hash_parameters(PublicKeyedHashParameters::new(KeyedHashScheme::Null))
         .with_keyed_hash_unique_identifier(Digest::default())
         .build()
-        .map_err(tss_error)
+        .map_err(|error| tss_error("sealed_public", error))
 }
 
 fn parent_public() -> Result<Public, Error> {
@@ -147,13 +154,13 @@ fn parent_public() -> Result<Public, Error> {
         .with_decrypt(true)
         .with_sign_encrypt(false)
         .build()
-        .map_err(tss_error)?;
+        .map_err(|error| tss_error("parent_public", error))?;
     let parameters = PublicEccParametersBuilder::new_restricted_decryption_key(
         SymmetricDefinitionObject::AES_128_CFB,
         EccCurve::NistP256,
     )
     .build()
-    .map_err(tss_error)?;
+    .map_err(|error| tss_error("parent_public", error))?;
     PublicBuilder::new()
         .with_public_algorithm(PublicAlgorithm::Ecc)
         .with_name_hashing_algorithm(HashingAlgorithm::Sha256)
@@ -161,14 +168,16 @@ fn parent_public() -> Result<Public, Error> {
         .with_ecc_parameters(parameters)
         .with_ecc_unique_identifier(EccPoint::default())
         .build()
-        .map_err(tss_error)
+        .map_err(|error| tss_error("parent_public", error))
 }
 
 fn sha256_name(public: &Public) -> Result<Vec<u8>, Error> {
     if public.name_hashing_algorithm() != HashingAlgorithm::Sha256 {
         return Err(Error::Provider("TPM object Name must use SHA256"));
     }
-    let bytes = public.marshall().map_err(tss_error)?;
+    let bytes = public
+        .marshall()
+        .map_err(|error| tss_error("sha256_name", error))?;
     let mut name = vec![0x00, 0x0b]; // TPM_ALG_SHA256, big endian.
     name.extend_from_slice(&Sha256::digest(&bytes));
     Ok(name)
@@ -183,11 +192,11 @@ fn create_parent(context: &mut Context) -> Result<(KeyHandle, Vec<u8>), Error> {
         .execute_with_session(Some(AuthSession::Password), |ctx| {
             ctx.create_primary(Hierarchy::Owner, template, None, None, None, None)
         })
-        .map_err(tss_error)?;
+        .map_err(|error| tss_error("create_parent", error))?;
     let name = sha256_name(&result.out_public)?;
     if context
         .tr_get_name(result.key_handle.into())
-        .map_err(tss_error)?
+        .map_err(|error| tss_error("create_parent", error))?
         .value()
         != name
     {
@@ -210,7 +219,7 @@ fn start_session(
             SymmetricDefinition::AES_128_CFB,
             HashingAlgorithm::Sha256,
         )
-        .map_err(tss_error)?
+        .map_err(|error| tss_error("start_session", error))?
         .ok_or(Error::Provider("TPM returned no session"))
 }
 
@@ -227,7 +236,7 @@ fn set_protection(
         .build();
     context
         .tr_sess_set_attributes(session, attributes, mask)
-        .map_err(tss_error)
+        .map_err(|error| tss_error("set_protection", error))
 }
 
 fn apply_policy(
@@ -235,27 +244,31 @@ fn apply_policy(
     session: AuthSession,
     descriptor: &Descriptor,
 ) -> Result<PolicySession, Error> {
-    let policy = PolicySession::try_from(session).map_err(tss_error)?;
+    let policy =
+        PolicySession::try_from(session).map_err(|error| tss_error("apply_policy", error))?;
     context
         .policy_pcr(
             policy,
-            Digest::try_from(descriptor.tpm_pcr_digest.as_slice()).map_err(tss_error)?,
+            Digest::try_from(descriptor.tpm_pcr_digest.as_slice())
+                .map_err(|error| tss_error("apply_policy", error))?,
             selection(descriptor.tpm_pcr_mask)?,
         )
-        .map_err(tss_error)?;
+        .map_err(|error| tss_error("apply_policy", error))?;
     context
         .policy_command_code(policy, CommandCode::Unseal)
-        .map_err(tss_error)?;
+        .map_err(|error| tss_error("apply_policy", error))?;
     Ok(policy)
 }
 
 fn expected_policy(context: &mut Context, descriptor: &Descriptor) -> Result<Digest, Error> {
     let session = start_session(context, None, SessionType::Trial)?;
     let policy = apply_policy(context, session, descriptor)?;
-    let digest = context.policy_get_digest(policy).map_err(tss_error)?;
+    let digest = context
+        .policy_get_digest(policy)
+        .map_err(|error| tss_error("expected_policy", error))?;
     context
         .flush_context(SessionHandle::from(session).into())
-        .map_err(tss_error)?;
+        .map_err(|error| tss_error("expected_policy", error))?;
     Ok(digest)
 }
 
@@ -302,16 +315,20 @@ impl TpmProvider for Tpm2Provider {
         let session = start_session(&mut context, Some(parent), SessionType::Hmac)?;
         set_protection(&mut context, session, true, true)?;
         let public = sealed_public(auth_policy.clone())?;
-        let sensitive = SensitiveData::try_from(seed.as_slice()).map_err(tss_error)?;
+        let sensitive =
+            SensitiveData::try_from(seed.as_slice()).map_err(|error| tss_error("seal", error))?;
         let result = context
             .execute_with_session(Some(session), |ctx| {
                 ctx.create(parent, public, None, Some(sensitive), None, None)
             })
-            .map_err(tss_error)?;
+            .map_err(|error| tss_error("seal", error))?;
         validate_public(&result.out_public, &auth_policy)?;
         let name = sha256_name(&result.out_public)?;
         Ok(TpmBlob {
-            public: result.out_public.marshall().map_err(tss_error)?,
+            public: result
+                .out_public
+                .marshall()
+                .map_err(|error| tss_error("seal", error))?,
             private: result.out_private.value().to_vec(),
             name,
             parent_name,
@@ -323,8 +340,12 @@ impl TpmProvider for Tpm2Provider {
         let body = envelope.body();
         let descriptor = &body.descriptor;
         require_network_bound(descriptor)?;
-        let public = Public::unmarshall(&body.tpm.public).map_err(tss_error)?;
-        if public.marshall().map_err(tss_error)? != body.tpm.public
+        let public =
+            Public::unmarshall(&body.tpm.public).map_err(|error| tss_error("unseal", error))?;
+        if public
+            .marshall()
+            .map_err(|error| tss_error("unseal", error))?
+            != body.tpm.public
             || sha256_name(&public)? != body.tpm.name
             || body.tpm.parent_name.len() != 34
         {
@@ -332,7 +353,8 @@ impl TpmProvider for Tpm2Provider {
                 "noncanonical TPM public or mismatched object Name",
             ));
         }
-        let private = Private::try_from(body.tpm.private.as_slice()).map_err(tss_error)?;
+        let private = Private::try_from(body.tpm.private.as_slice())
+            .map_err(|error| tss_error("unseal", error))?;
         let mut context = self.context()?;
         let auth_policy = expected_policy(&mut context, descriptor)?;
         validate_public(&public, &auth_policy)?;
@@ -344,10 +366,10 @@ impl TpmProvider for Tpm2Provider {
             .execute_with_session(Some(AuthSession::Password), |ctx| {
                 ctx.load(parent, private, public)
             })
-            .map_err(tss_error)?;
+            .map_err(|error| tss_error("unseal", error))?;
         if context
             .tr_get_name(object.into())
-            .map_err(tss_error)?
+            .map_err(|error| tss_error("unseal", error))?
             .value()
             != body.tpm.name
         {
@@ -360,7 +382,7 @@ impl TpmProvider for Tpm2Provider {
         set_protection(&mut context, session, false, true)?;
         let sensitive = context
             .execute_with_session(Some(session), |ctx| ctx.unseal(object.into()))
-            .map_err(tss_error)?;
+            .map_err(|error| tss_error("unseal", error))?;
         if sensitive.value().len() != 32 {
             return Err(Error::Provider("unsealed seed has unexpected length"));
         }

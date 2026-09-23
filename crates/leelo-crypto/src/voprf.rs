@@ -1,6 +1,7 @@
+use crate::operation_rng::OperationRng;
 use crate::{Error, MAX_INPUT_BYTES, OUTPUT_BYTES, POINT_BYTES, PROOF_BYTES, Result, random_bytes};
 use p384::NistP384;
-use rand_core::OsRng;
+use rand_core::{CryptoRng, OsRng, RngCore};
 use voprf::{BlindedElement, EvaluationElement, Group, Proof, VoprfClient, VoprfServer};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -77,11 +78,18 @@ impl SecretServer {
 
     /// Evaluate one validated point and generate an RFC 9497 DLEQ proof.
     pub fn evaluate(&self, blinded: &[u8; POINT_BYTES]) -> Result<Evaluation> {
+        self.evaluate_with_entropy(blinded, &mut OsRng)
+    }
+
+    fn evaluate_with_entropy(
+        &self,
+        blinded: &[u8; POINT_BYTES],
+        entropy: &mut (impl CryptoRng + RngCore),
+    ) -> Result<Evaluation> {
         let message =
             BlindedElement::<NistP384>::deserialize(blinded).map_err(|_| Error::InvalidEncoding)?;
-        // The RFC API requires an infallible CryptoRng.
-        // OsRng panics if the OS entropy source fails. The operation stops with no weak fallback.
-        let result = self.inner.blind_evaluate(&mut OsRng, &message);
+        let mut rng = OperationRng::from_entropy(entropy)?;
+        let result = self.inner.blind_evaluate(&mut rng, &message);
         let mut element = [0; POINT_BYTES];
         element.copy_from_slice(&result.message.serialize());
         let mut proof = [0; PROOF_BYTES];
@@ -98,10 +106,18 @@ pub struct BlindState {
 
 /// The input remains local. The returned wire message never contains the input.
 pub fn blind(input: &[u8]) -> Result<(BlindState, [u8; POINT_BYTES])> {
+    blind_with_entropy(input, &mut OsRng)
+}
+
+fn blind_with_entropy(
+    input: &[u8],
+    entropy: &mut (impl CryptoRng + RngCore),
+) -> Result<(BlindState, [u8; POINT_BYTES])> {
     if input.is_empty() || input.len() > MAX_INPUT_BYTES {
         return Err(Error::InvalidInput);
     }
-    let result = VoprfClient::<NistP384>::blind(input, &mut OsRng)
+    let mut rng = OperationRng::from_entropy(entropy)?;
+    let result = VoprfClient::<NistP384>::blind(input, &mut rng)
         .map_err(|_| Error::CryptographicOperation)?;
     let mut message = [0; POINT_BYTES];
     message.copy_from_slice(&result.message.serialize());

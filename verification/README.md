@@ -1,118 +1,122 @@
-# Policy and arithmetic proofs
+# Production proofs
+
+The verifier checks the same executable source that Cargo builds. The current
+suite checks **28 policy, 38 sharing-arithmetic, and 8 release obligations**, with
+zero errors. These 74 obligations are not 74 independent security theorems.
+The [current record](assurance-upgrades.json) identifies the checked source hashes.
 
 ## Run the verifier
 
-Install Rust 1.96.0 through rustup before you run the proof scripts.
-The scripts do not change the global default toolchain.
+Install Rust 1.96.0 through rustup. The scripts do not change the global default.
 
-To check the policy contracts, use the command for your platform:
-
-| Platform | Command |
-|---|---|
-| Windows | `pwsh -File scripts/verify-policy.ps1` |
-| Linux | `bash scripts/verify-policy.sh` |
-
-To check both the policy contracts and finite-field arithmetic, use one of these commands:
-
-| Platform | Command |
-|---|---|
-| Windows | `pwsh -File scripts/verify.ps1` |
-| Linux | `bash scripts/verify.sh` |
+| Platform | All proofs | Policy proofs only |
+|---|---|---|
+| Windows | `pwsh -File scripts/verify.ps1` | `pwsh -File scripts/verify-policy.ps1` |
+| Linux | `bash scripts/verify.sh` | `bash scripts/verify-policy.sh` |
 
 For the first run, add `-InstallVerus` on Windows or `--install-verus` on Linux.
-This option downloads the specified official archive into `.tools`.
-The script checks the specified SHA-256 checksum before it extracts the archive.
-`toolchain.json` records the versions, checksums, and official download source.
+The scripts download the specified official archive into `.tools` and check
+its pinned SHA-256 before extraction. [toolchain.json](toolchain.json) records
+the versions, checksums, and download source.
 
-The scripts use Verus `--no-cheating` mode.
-They also check the local source for annotations that bypass the proof.
+The scripts use Verus `--no-cheating`. They scan the local proof source for
+annotations that bypass verification. No local `assume`, `admit`, `external_body`,
+or external specification is permitted. Cargo uses the pinned `vstd` macros to
+remove proof and specification code from normal builds.
 
-## Production policy source
+## Policy decisions and compilation
 
-`policy.rs` includes **the actual executable file** `crates/leelo-policy/src/verified.rs`.
-Cargo compiles the same file with the specified `vstd` macros.
-These macros remove proof and specification code from normal Rust builds.
-The proof build does not use a copy or a replacement implementation.
-The source has no local `assume`, `admit`, `external_body`, or external specification.
+[policy.rs](policy.rs) includes the actual production files
+`crates/leelo-policy/src/verified.rs` and `verified_compile.rs`.
 
-The first native Windows run reported **10 verified, 0 errors**.
-The run used Verus `0.2026.06.28.1847ab3`, Rust `1.96.0-x86_64-pc-windows-msvc`, and the supplied Z3 solver.
-The proof covers these contracts:
-
-| Production function | Verified contract |
+| Production contract | Guarantee |
 |---|---|
-| `evaluate_gate` | The result agrees with the specified threshold and leaf rules. The function rejects zero thresholds, oversized thresholds, and dangling edges. The loop terminates. Arithmetic operations and index operations meet their safety requirements. |
-| `evaluate_network` | The result equals the final value of the recursive postorder specification. This contract includes rejection of an empty program. |
-| `record_response` | The function accepts an observation only if its index is in range and its previous value is false. It changes only that value to true. A duplicate or invalid index causes no change to the response vector. |
-| `can_release` | The result is true if and only if all required observations are present and no release occurred. Required observations are envelope, TPM, network, and root authentication. Attested mode also requires the live-authorization observation. |
-| `try_release` | The function permits release if and only if the release predicate was true. It changes only the released flag. The same state cannot permit a second release. |
+| Gate and network evaluation | Evaluation agrees with the recursive postorder specification. Invalid thresholds and dangling edges fail. Loops terminate and index operations meet their bounds. |
+| Response recording | Only a valid, previously false response position can change to true. Duplicate or invalid responses cause no change. |
+| Policy release | The required observations must be present. Attested mode also requires live authorization. A state permits at most one release. |
+| Gate copy | Copying preserves the complete gate contents. |
+| Source-to-plan certificate | Every accepted plan has the same threshold result as the source tree for every response assignment. It preserves leaf IDs, provider order, thresholds, child order, and edges, and consumes the complete plan. |
 
-The verifier count includes specification and termination obligations.
-The count does not identify ten independent security theorems for the full design.
-The proof does not establish security for the complete program.
+`ProductionPolicy::new` validates and compiles a tree, then executes the verified
+certificate checker before it returns a policy. A compiler mismatch fails
+admission. The compiler traversal is ordinary Rust. Its semantic fidelity is
+checked at runtime instead of being a trusted assumption. The checker does not
+prove compiler completeness or the validator's unique-ID and size checks.
 
-The [Fedora 44 VM run](../docs/fedora-vm-test-report.md) also ran both proof scripts on native Linux.
-That run used the specified Verus release and Rust 1.96.0.
-It reported **10 policy and 11 arithmetic obligations verified, zero errors**.
-The report records the production source hashes for that run.
-It separates the VM integration results from the proof claims.
+Sharing, recovery, and decisions use the same private plan. The certificate
+proves threshold decision semantics. It does not prove the recursive sharing and
+recovery adapters. The source type's derived traits are outside verification.
 
-The [documentation recheck](documentation-recheck.json) records the proof run after the Simplified Technical English rewrite.
-Both proof suites passed again with 10 policy and 11 arithmetic obligations, and zero errors.
-The record contains the new source hashes.
-Earlier result files and the Fedora report retain the hashes from their original runs.
+Tests cover invalid policies, corrupted certificates, 256 generated trees, all
+leaf subsets of those trees, leaf order, duplicate responses, surplus shares,
+and the mandatory TPM factor. Tests supplement the proof; they do not extend it.
 
-## Proof limits and assumptions
+## Field arithmetic and interpolation
 
-* `ProductionPolicy::new`, nested input validation, and the policy compiler have ordinary Rust tests. They do not have a compiler-equivalence proof. The compiler converts a public tree to a postorder program. The runtime cannot encode an alternative to the mandatory TPM root. No mechanized theorem currently proves this API property.
-* The verified evaluator counts child positions. The public validator and compiler establish unique node identities, provider identities, and compiled edges. Tests check these properties. The proof does not silently assume these conditions in a separate model.
-* `PolicySession` supplies booleans only after its caller reports authenticated observations. The proof does not authenticate signatures, AEAD tags, TPM messages, device identity, or network providers. It does not establish freshness. An incorrect or dishonest caller can report false observations. Production adapters remain part of the trusted integration boundary.
-* The policy core owns no key material. It returns a release decision, not plaintext. These policy contracts do not cover secret sharing, cryptographic confidentiality, constant-time execution, or key erasure. A separate proof covers multiplication, as specified below.
-* The Rust compiler, Verus translation, SMT solver, and specified Verus library and specifications remain trusted. The prohibition on local proof bypasses does not remove trust in standard-library contracts.
-* A public policy can have a maximum of 31 nodes. This count includes the implicit root and mandatory TPM node. Maximum depth is 4, including the implicit root. The network subtree starts at depth 2. Enforce parser and allocation limits before you construct a recursive tree from attacker-controlled input.
-* Model replay, late provider responses, deadlines, cancellation, and cryptographic binding in the integration. The proof covers duplicate accounting and the final release gate. A boolean alone cannot establish freshness.
+[sss.rs](sss.rs) includes the actual `crates/leelo-sss/src/gf256.rs` and
+`interpolation.rs` used by splitting and reconstruction.
 
-## Regression tests
+The multiplication proof establishes agreement with carryless polynomial
+multiplication modulo `x^8+x^4+x^3+x+1` (`0x11b`). It also proves agreement between
+compact reduction and polynomial long division for every 16-bit input.
+The inverse contract proves `mul(a, inverse_nonzero(a)) == 1` for every nonzero
+byte. The source uses fixed masked multiplication rounds and a fixed exponent chain.
 
-`cargo test -p leelo-policy` checks these properties and failure conditions:
+The interpolation contracts relate production Horner evaluation, Lagrange
+weights, and weighted byte sums to their mathematical specifications. A separate
+theorem proves recovery for every secret and slope in the mandatory 2-of-2 root
+at coordinates 1 and 2.
 
-* Node collisions and provider collisions.
-* Invalid thresholds, size limits, and depth limits.
-* The mandatory TPM factor, even when two network factors succeed.
-* Duplicate retries and attested authorization.
-* Root authentication and release at most once.
+There is **no general t-of-n reconstruction theorem or probabilistic secrecy
+proof**. Public validation, random coefficient generation, 32-byte assembly,
+surplus-share checks, and the recursive network sharing adapter remain ordinary
+Rust. Tests compare all byte products and nonzero inverses, and compare generated
+sharing cases with a separate polynomial long-division oracle.
 
-The tests compare all subsets of a nested policy with a separate recursive reference evaluator.
-These tests give evidence for the compiler, which has no equivalence proof.
-They do not replace that proof.
+## Context and release order
 
-When you change a proof, update this description of its limits.
-Keep the reference to the same production source file.
-Run the complete verifier before you claim that the contracts remain proved.
-Do not accept omitted functions, timeouts, or unknown results as a successful proof.
+[release.rs](release.rs) includes the actual private engine gate in
+`crates/leelo-engine/src/release.rs`.
 
-## Production GF(256) multiplication
+The gate requires the complete 48-byte descriptor context at each transition.
+It accepts network, TPM, and payload evidence in that order. The TPM transition
+requires the live-authorization flag in attested mode. Release requires a true
+deadline observation and can occur only once. Rejected transitions preserve state.
 
-`gf256.rs` includes the actual `crates/leelo-sss/src/gf256.rs` that sharing and interpolation use.
-The native Windows run reported **11 verified, 0 errors** with the specified toolchain and `--no-cheating`.
-The production multiplier uses eight fixed masked rounds.
-The code explicitly expands these rounds to keep the refinement proof small.
+A private consuming `UnlockOperation` owns the authenticated envelope, deadline,
+policy session, and release gate. Private evidence values own zeroizing secrets.
+The operation creates each value after the corresponding authentication step.
+They have no public constructor, `Clone`, `Debug`, or serializer. The descriptor
+context is not a per-attempt nonce. Isolation between attempts comes from this
+private ownership and the consuming operation, not from context uniqueness.
 
-The mathematical specification constructs the 16-bit carryless product of two bytes.
-It then reduces the product modulo `x^8+x^4+x^3+x+1` (`0x11b`).
-A separate proof compares compact polynomial-basis reduction with eight steps of polynomial long division.
-The two results agree for every 16-bit input.
-The production `mul` postcondition proves agreement with the specification for every pair of bytes.
-The proof also checks the `xtime` and masked-term helper contracts.
+The proof checks context equality and state transitions. It does **not** prove
+that an AEAD tag, VOPRF proof, TPM response, or clock observation is valid. The
+private Rust orchestration supplies those facts and remains subject to integration
+tests and review. A false caller-supplied observation is outside the theorem.
+The production TPM adapter still rejects the unimplemented attested profile.
 
-These proofs relate the actual source to its specification.
-They do not prove a replacement reference implementation.
-The proof does **not** establish the full Shamir interpolation or secrecy theorem.
-The source safety check includes `inverse_nonzero`.
-However, the function has no formal postcondition that proves a multiplicative inverse for each nonzero input.
-Runtime tests check that property for all 255 nonzero bytes.
-A separate multiplication test compares all 65,536 byte pairs with an independent long-division implementation.
+## Trust boundary
 
-The multiplier has no source branches or table indexes that depend on secret values.
-The proof establishes functional behavior and safety.
-It does not establish machine-code timing, microarchitectural behavior, zeroization, or cryptographic noninterference.
+The Rust compiler, Verus translation, SMT solver, and pinned library contracts
+remain trusted. No proof establishes cryptographic composition, whole-system
+confidentiality, TPM or FFI correctness, secret erasure, or machine-code timing.
+Source code without secret-dependent branches does not establish constant-time
+machine code. Tests with a software TPM do not qualify hardware or firmware.
+
+When a proof changes, update this description and run the complete verifier.
+Do not accept omitted functions, timeouts, or unknown results as a successful
+proof. Keep the verifier pointed at the production source.
+
+## Historical results
+
+Earlier records retain their original hashes and scope:
+
+* The [initial Fedora run](../docs/fedora-vm-test-report.md) checked 10 policy and
+  11 arithmetic obligations.
+* The [documentation recheck](documentation-recheck.json) checked the same counts
+  after comment and documentation edits.
+* The [architecture-fix record](review-fixes.json) checked 11 policy and
+  11 arithmetic obligations after the gate-copy contract was added.
+
+Those records describe earlier source versions. They are not the current proof scope.

@@ -319,7 +319,7 @@ Implement multiplication/inversion without secret-indexed lookup tables or secre
 
 Authenticate each leaf wrapper before you count it. A duplicate response cannot count twice. Parent and root reconstruction must not release plaintext before verification of the final AEAD tag.
 
-Shamir sharing supplies secrecy. It does not supply authenticity. With signed envelopes and authenticated leaves, inconsistent shares indicate corruption or a construction error. Fail on inconsistent shares. Do not search an exponential number of subsets.
+Shamir sharing supplies secrecy. It does not supply authenticity. Enrollment checks the complete share set and each network wrapper before signing. Unlock stops after it collects a sufficient set of authenticated leaves. It checks all collected shares, including surplus shares in nested branches. It does not fetch additional leaves only to check consistency. If collected shares disagree, fail. Do not search an exponential number of subsets.
 
 Run independent network leaves concurrently within a fixed limit. Evaluate only branches that the policy needs. Cancel remaining work after success. An optimization must never remove a mandatory TPM or fresh-authorization requirement.
 

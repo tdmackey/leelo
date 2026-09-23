@@ -38,6 +38,8 @@ A network tree leaf is `[0, node_id, provider_id32]`. A threshold is `[1, node_i
 
 `leelo-policy` checks production policy limits and identity uniqueness. Network bindings follow tree traversal order. Each binding is `[node_id, provider_id32, key_id32, public_key49, input_seed32]`.
 
+The key ID is the first 32 bytes of SHA-384 applied to the encoded public key. Envelope validation rejects a key ID that does not match that public key. The shared `leelo-protocol` crate owns this rule and the evaluator messages.
+
 The decoder rejects repeated evaluation public keys and repeated key IDs.
 
 The TPM blob is `[public_bytes, private_bytes, child_name, parent_name]`. Each blob contains 1..4096 bytes. Each Name contains 1..68 bytes.

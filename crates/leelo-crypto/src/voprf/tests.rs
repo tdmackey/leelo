@@ -155,3 +155,68 @@ fn reject_invalid_points_scalars_and_input_bounds() {
     assert!(blind(b"").is_err());
     assert!(blind(&vec![1; MAX_INPUT_BYTES + 1]).is_err());
 }
+
+struct FailingEntropy {
+    calls: usize,
+}
+
+impl RngCore for FailingEntropy {
+    fn next_u32(&mut self) -> u32 {
+        panic!("infallible entropy method used")
+    }
+    fn next_u64(&mut self) -> u64 {
+        panic!("infallible entropy method used")
+    }
+    fn fill_bytes(&mut self, _: &mut [u8]) {
+        panic!("infallible entropy method used")
+    }
+    fn try_fill_bytes(&mut self, bytes: &mut [u8]) -> core::result::Result<(), rand_core::Error> {
+        self.calls += 1;
+        // Also model an entropy provider that modifies the seed before failing.
+        bytes.fill(0x5a);
+        Err(rand_core::Error::from(
+            core::num::NonZeroU32::new(rand_core::Error::CUSTOM_START).unwrap(),
+        ))
+    }
+}
+impl CryptoRng for FailingEntropy {}
+
+#[test]
+fn entropy_failure_returns_an_error_before_blinding_or_evaluation() {
+    let mut entropy = FailingEntropy { calls: 0 };
+    assert_eq!(
+        blind_with_entropy(b"input", &mut entropy).err(),
+        Some(Error::Randomness)
+    );
+    assert_eq!(entropy.calls, 1);
+    let server = SecretServer::from_secret_bytes(&bytes(RFC_SECRET)).unwrap();
+    // A public key encoding is also a valid input point for testing this boundary.
+    assert_eq!(
+        server
+            .evaluate_with_entropy(&bytes(RFC_PUBLIC), &mut entropy)
+            .err(),
+        Some(Error::Randomness)
+    );
+    assert_eq!(entropy.calls, 2);
+    // Reject public malformed input before requesting entropy.
+    assert_eq!(
+        blind_with_entropy(b"", &mut entropy).err(),
+        Some(Error::InvalidInput)
+    );
+    assert_eq!(
+        server
+            .evaluate_with_entropy(&[0; POINT_BYTES], &mut entropy)
+            .err(),
+        Some(Error::InvalidEncoding)
+    );
+    assert_eq!(entropy.calls, 2);
+}
+
+#[test]
+fn fresh_proof_randomness_changes_proof_without_changing_evaluated_point() {
+    let server = SecretServer::from_secret_bytes(&bytes(RFC_SECRET)).unwrap();
+    let a = server.evaluate(&bytes(RFC_PUBLIC)).unwrap();
+    let b = server.evaluate(&bytes(RFC_PUBLIC)).unwrap();
+    assert_eq!(a.element, b.element);
+    assert_ne!(a.proof, b.proof);
+}

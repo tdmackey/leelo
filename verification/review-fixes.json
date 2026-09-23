@@ -1,0 +1,21 @@
+{
+  "checked_at_utc": "2026-09-23T07:07:00.6153671Z",
+  "command": "pwsh -File scripts/verify.ps1",
+  "platform": "windows_x86_64",
+  "verus": "0.2026.06.28.1847ab3",
+  "proof_toolchain": "1.96.0-x86_64-pc-windows-msvc",
+  "no_cheating": true,
+  "policy": {
+    "verified": 11,
+    "errors": 0,
+    "source": "crates/leelo-policy/src/verified.rs",
+    "sha256": "7b5ace310c54092ad36e1e12fd3233172fa8d6575b3448e0ed42cc2fe820737d"
+  },
+  "arithmetic": {
+    "verified": 11,
+    "errors": 0,
+    "source": "crates/leelo-sss/src/gf256.rs",
+    "sha256": "ce4856935f1dab8f548e10e334c51b4fbc62178f9032c0e9ab446d9d9bfbff28"
+  },
+  "scope": "Production decision contracts, gate-copy preservation, and field multiplication. No compiler-equivalence, full Shamir, or end-to-end security proof."
+}

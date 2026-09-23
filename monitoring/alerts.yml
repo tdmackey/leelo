@@ -1,0 +1,123 @@
+groups:
+  - name: leelo
+    rules:
+      - alert: LeeloEvaluationUnavailable
+        expr: leelo_probe_success == 0 and on(instance, target) (time() - leelo_probe_last_attempt_timestamp_seconds < 120)
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: A configured evaluator fails valid evaluation probes.
+          description: Check the probe outcome, service state, client network, public pin, and recent changes. Follow docs/observability.md.
+      - alert: LeeloProbeStale
+        expr: time() - leelo_probe_last_attempt_timestamp_seconds > 120
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: A Leelo probe has no recent result.
+          description: Health is unknown. Check the probe timer, textfile writer, collector, and clock.
+      - alert: LeeloProbeMissing
+        expr: leelo_expected_probe unless on(instance, target) leelo_probe_last_attempt_timestamp_seconds
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: An expected Leelo probe series is missing.
+          description: Restore collection or correct the external expected-target inventory. Do not remove a failed target to clear this alert.
+      - alert: LeeloProbeCollectionIncomplete
+        expr: leelo_probe_collection_success == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: A Leelo probe cannot supply a complete observation.
+          description: Check certificate observation, local time, probe configuration, and textfile permissions.
+      - alert: LeeloCertificateRenewalDue
+        expr: (leelo_tls_certificate_not_after_timestamp_seconds - time() < 1209600) and on(instance, target) (time() - leelo_probe_last_attempt_timestamp_seconds < 120)
+        labels:
+          severity: warning
+        annotations:
+          summary: The observed evaluator certificate expires within 14 days.
+          description: Renew the TLS certificate and verify the deployed chain with the probe. Evaluation-key replacement is a separate operation.
+      - alert: LeeloCapacityRejected
+        expr: sum by(instance, role) (rate(leelo_connections_total{admission="capacity_rejected"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Leelo continually rejects work at its concurrency limit.
+          description: Compare valid probes, request rates, connection duration, and host pressure before changing limits.
+      - alert: LeeloListenerImpaired
+        expr: leelo_listener_retrying == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: A Leelo listener remains in its retry state.
+          description: Check file descriptors, memory, network state, and accept-error classes.
+      - alert: LeeloInternalEvaluationFailure
+        expr: sum by(instance) (increase(leelo_server_stage_completions_total{stage="crypto",outcome=~"randomness_failure|crypto_failure"}[5m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: The key worker reported an internal evaluation failure.
+          description: Check service restarts and entropy or backend failures. Keep secret material out of diagnostics.
+      - alert: LeeloAuthenticatedPathRejected
+        expr: sum by(instance) (increase(leelo_provider_failures_total{reason=~"invalid_proof|authentication"}[5m])) > 0 or sum by(instance) (increase(leelo_client_failures_total{reason=~"target_mismatch|inconsistent_shares|envelope"}[5m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Leelo rejected cryptographic evidence or target metadata.
+          description: Investigate promptly. Compare trusted pins, enrolled metadata, deployment changes, and possible tampering; a rejection does not identify its cause.
+      - alert: LeeloDaemonMetricsStale
+        expr: time() - leelo_daemon_snapshot_timestamp_seconds > 60
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: A Leelo daemon metrics snapshot is stale.
+          description: Check the snapshot timer, authorized collector UID, socket permissions, and service state.
+      - alert: LeeloEventCollectorStale
+        expr: time() - leelo_collector_snapshot_timestamp_seconds > 30
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: The Leelo event collector cannot publish current state.
+          description: Check its service, textfile destination, and filesystem capacity. Unlock must remain independent of this collector.
+      - alert: LeeloTelemetryLost
+        expr: increase(leelo_telemetry_dropped_total[5m]) > 0 or increase(leelo_telemetry_reported_drops_total[5m]) > 0 or increase(leelo_collector_write_failures_total[5m]) > 0 or increase(leelo_collector_series_rejected_total[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Leelo observations were lost or could not be retained.
+          description: Check local socket availability, event rate, source configuration, storage, and metric limits. Counts can understate complete delivery loss.
+      - alert: LeeloExpectedBootIncomplete
+        expr: leelo_boot_targets{state=~"failure|missing|late_success"} > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: An expected boot has failed or missed its activation deadline.
+          description: Use the external boot inventory and management-plane evidence. Follow the approved recovery process without weakening TPM or network policy.
+      - alert: LeeloFleetObservationUnknown
+        expr: leelo_boot_targets{state="unknown"} > 0 or leelo_inventory_fresh == 0 or leelo_boot_observations_fresh == 0 or leelo_enrollments_unknown > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Leelo cannot establish current fleet or enrollment state.
+          description: Refresh trusted inventory and observations; inspect unreadable or incomplete local journals. Missing evidence is not success.
+      - alert: LeeloEnrollmentNeedsReconciliation
+        expr: leelo_enrollments_requiring_reconciliation > 0 and (time() - leelo_oldest_enrollment_requiring_reconciliation_timestamp_seconds > 3600)
+        labels:
+          severity: warning
+        annotations:
+          summary: An enrollment journal remains incomplete for over one hour.
+          description: Inspect the pending bundle and exact slot through the supported recovery workflow. Retain recovery credentials and do not delete slots automatically.
+      - alert: LeeloEnrollmentBootTestOverdue
+        expr: leelo_enrollments_awaiting_boot_test > 0 and (time() - leelo_oldest_enrollment_awaiting_boot_test_timestamp_seconds > 3600)
+        labels:
+          severity: warning
+        annotations:
+          summary: A committed enrollment still needs its production boot test.
+          description: Perform the approved boot qualification and update the trusted inventory. A local credential test is not production boot evidence.

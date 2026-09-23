@@ -2,7 +2,9 @@
 Description=Leelo private evaluation key worker
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
+TimeoutStartSec=30
 User=leelo-key
 Group=leelo-ipc
 EnvironmentFile=/etc/leelo-key/worker.env

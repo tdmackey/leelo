@@ -20,6 +20,8 @@ getenforce
 rpm -q gcc glibc tpm2-tss tpm2-tss-devel cryptsetup cryptsetup-libs openssl swtpm systemd selinux-policy
 bash scripts/check.sh
 bash scripts/test-tpm.sh
+bash scripts/test-luks.sh
+bash scripts/test-enrollment-persistence.sh
 bash scripts/test-e2e.sh
 rustup toolchain install 1.96.0 --profile minimal
 bash scripts/verify.sh --install-verus

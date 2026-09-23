@@ -172,7 +172,8 @@ ssh)
     ;;
 stage)
     load_lab
-    tar -czf "$cache/source.tar.gz" -C "$repo" Cargo.toml Cargo.lock rust-toolchain.toml crates scripts docs verification
+    tar -czf "$cache/source.tar.gz" -C "$repo" --exclude='fuzz/target' --exclude='fuzz/artifacts' \
+        Cargo.toml Cargo.lock rust-toolchain.toml deny.toml crates scripts docs verification test-vectors fuzz monitoring
     for role in ${2:-evaluator client}; do
         port_for "$role" >/dev/null
         ssh_for "$role" 'mkdir -p /home/leelo/leelo; tar -xzf - -C /home/leelo/leelo' <"$cache/source.tar.gz"

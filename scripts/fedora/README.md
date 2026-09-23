@@ -161,7 +161,18 @@ sudo bash scripts/fedora/guest-test.sh network-off-check
 ```
 
 Restart the evaluator's HTTP service.
-Then run this command on the client:
+Before the PCR negative test, run the DNS cancellation test on the client:
+
+```sh
+sudo bash scripts/fedora/guest-dns-timeout.sh
+```
+
+This test uses a private mount namespace and a local DNS sink.
+It checks that the complete unlock process exits within 7.5 seconds with a timeout error.
+The test preserves the guest resolver and LUKS metadata.
+The fixture must have an enrolled, closed data volume and an unchanged TPM policy.
+
+Then run the remaining negative tests:
 
 ```sh
 sudo bash scripts/fedora/guest-test.sh negative-tests
@@ -176,6 +187,7 @@ sudo bash scripts/fedora/vm-lab.sh ssh client 'sudo bash /home/leelo/leelo/scrip
 sudo bash scripts/fedora/vm-lab.sh ssh evaluator 'sudo systemctl stop leelo-http.service'
 sudo bash scripts/fedora/vm-lab.sh ssh client 'sudo bash /home/leelo/leelo/scripts/fedora/guest-test.sh network-off-check'
 sudo bash scripts/fedora/vm-lab.sh ssh evaluator 'sudo systemctl start leelo-http.service'
+sudo bash scripts/fedora/vm-lab.sh ssh client 'sudo bash /home/leelo/leelo/scripts/fedora/guest-dns-timeout.sh'
 sudo bash scripts/fedora/vm-lab.sh ssh client 'sudo bash /home/leelo/leelo/scripts/fedora/guest-test.sh negative-tests'
 ```
 
@@ -209,3 +221,4 @@ Examine the recorded process domains and AVCs.
 The tests do not disable SELinux or generate unreviewed allow rules.
 
 Refer to the [Fedora 44 test results](../../docs/fedora-vm-test-report.md) for versions, evidence, and limits.
+The [review-fix validation](../../docs/fedora-review-fixes-test-report.md) records the later service, DNS, and block-device checks.

@@ -7,17 +7,27 @@ A verified policy decision cannot validate missing attestation evidence. It also
 ## Implemented functions
 
 * Rust policy validation requires a local TPM branch and a network threshold subtree. Validation rejects duplicate node IDs, duplicate provider identities, malformed thresholds, and oversized policies.
+* A private compiled plan owns policy leaf order, child relationships, and share coordinates. A verified runtime certificate checks source-to-plan decision equivalence for every response assignment before admission. Sharing, recovery, and decision sessions use that plan. Enrollment checks all generated shares before signing. Unlock checks all collected shares and cancels pending work when the policy has sufficient factors.
+* A private consuming unlock operation owns the authenticated envelope, deadline, factor evidence, and release gate. The verified gate checks the complete context and transition order before release. Cryptographic authentication and clock observations remain integration obligations.
 * Normal Cargo builds use the executable policy functions that contain Verus annotations. The pinned proof runner uses the same functions. Refer to `verification/README.md` for theorem boundaries and tool assumptions.
 * Shamir shares contain 32 bytes over GF(256). Coordinates are distinct and nonzero. Coefficients are independent. Share ownership includes zeroization. Arithmetic proofs and exhaustive tests establish separate claims.
-* The cryptographic profile uses RFC 9497 P-384 VOPRF, HKDF-SHA384, ChaCha20-Poly1305, and strict Ed25519 verification. The implementation provides fixed wrapper interfaces and published primitive test vectors.
+* The cryptographic profile uses RFC 9497 P-384 VOPRF, HKDF-SHA384, ChaCha20-Poly1305, and strict Ed25519 verification. The implementation provides fixed wrapper interfaces and published primitive test vectors. Each VOPRF operation obtains a fresh seed through fallible OS entropy before it enters the upstream infallible RNG interface. Entropy failure returns an error.
 * Signatures authenticate deterministic-CBOR envelopes. Trusted signing keys are external. Token metadata cannot select a credential file, command, or arbitrary URL. Authentication covers node, provider, and key identities, and the LUKS slot association.
 * The TPM2-TSS network-bound adapter requires explicit SHA256 PCR equality and restricts use to Unseal. The adapter pins parent and child Names. It uses policy-only objects and salted encrypted sessions. It cleans up the resources that it owns.
 * The direct libcryptsetup adapter adds LUKS2 slots, tests credentials, stores tokens, and activates mappings. The adapter does not run shell commands for cryptography or manipulate raw headers.
 * The TLS evaluator and client use a separately invoked private-key worker. Secret protection and frontend separation require separate OS identities and private filesystem permissions. The service documentation specifies these requirements.
+* Network recovery limits concurrent evaluations to four. Each complete provider response has a five-second deadline. Asynchronous DNS avoids a blocking system resolver during runtime shutdown. An operation has one 30-second budget. The engine checks this budget before release and around synchronous TPM calls, but it cannot interrupt a blocked TPM driver call.
+* The key worker reports readiness after key validation and socket setup. Temporary accept failures use bounded retry delays. Key creation synchronizes file data and the parent directory before reporting success.
+* The frontend also reports startup readiness. Both daemon roles expose optional, UID-protected local metrics sockets. Fixed metric arrays account for admission, TLS, IPC, evaluation, timeout, and cancellation outcomes.
+* Fixed-capacity engine reports distinguish authenticated factors, failed factors, quorum/deadline cancellation, and unstarted work. The CLI reports command outcomes after the requested storage action and preserves committed storage state when a final journal write fails.
+* Optional nonblocking local events contain a closed vocabulary and no volume or binding identifiers. The collector authenticates kernel source roles, bounds retained state, repairs partial log tails, and exports aggregate textfiles. The independent probe verifies actual TLS/VOPRF responses and reports the served certificate expiry. Refer to [operational observations](observability.md) for delivery and retention limits.
+* The LUKS adapter reloads metadata through the pinned target. It checks token IDs and JSON capacity before AddKey. A conservative keyslot metadata reservation can reject a nearly full header. Leelo writer locks do not coordinate native cryptsetup writers. Refer to [the storage contract](../crates/leelo-luks/README.md).
 
 ## Missing functions and assurance gaps
 
 EK certificate and fleet inventory onboarding are not implemented. Quote and event-log appraisal are not implemented. Production live `PolicySigned` authorization and per-binding attested evaluator authorization are not implemented.
+
+Operational reconciliation accepts externally maintained expected-boot inventory and completion evidence. It does not discover machines, authenticate remote fleet reports, or provide permanent central audit retention. Metrics do not enforce a lifetime cryptographic-query budget.
 
 The production TPM adapter explicitly rejects `Attested`. Test doubles exercise the policy gate. They do not provide attestation assurance.
 
@@ -27,11 +37,13 @@ Enrollment is not an atomic transaction across multiple commands. The transactio
 
 Before slot creation, the CLI uses fsync on a signed encrypted pending bundle and its parent directory. `resume-enrollment` authenticates that bundle and recovers the credential. It tests the exact signed slot before token attachment.
 
+A private enrollment module owns durable records, provider checks, and storage commit. The storage adapter owns metadata refresh and committed-state checks. Safe provider diagnostics remain available on quorum failure and degraded success. TPM diagnostics preserve the operation and native error information.
+
 The resume operation cannot recreate a slot if the interruption occurred before slot creation. The tool reports failures after slot addition explicitly. It never deletes a recovery slot to compensate for a failure.
 
 Hardware and firmware platforms are not qualified. A power-loss storage test campaign has not been completed. Software-TPM, regular-file LUKS2, and disposable VM data-volume tests provide narrower evidence.
 
-There is no computational proof of the VOPRF/SSS/AEAD composition. There is no probabilistic Shamir secrecy proof linked to executable code. Policy compiler refinement is incomplete. Machine code has no constant-time proof.
+There is no computational proof of the VOPRF/SSS/AEAD composition. There is no probabilistic Shamir secrecy proof or general t-of-n reconstruction theorem linked to executable code. The verified compilation certificate proves decision equivalence; validator completeness and recursive share distribution remain outside that proof. Machine code has no constant-time proof.
 
 The cryptographic backend has no independent audit. The documented assurance limitations of the P-384 candidate remain a release blocker.
 
@@ -71,10 +83,29 @@ Evaluator UID separation and key-file and IPC access checks passed with SELinux 
 
 These results do not establish a UKI measurement policy or custom SELinux confinement. No test used a physical TPM or physical disk. Initramfs encrypted-root boot has not been tested.
 
-The [proof results](../verification/README.md) record 10 policy and 11 arithmetic obligations verified with zero errors. Historical source hashes identify the production files used for those runs. They identify the tested revision before later documentation and source-comment edits.
+The initial [proof results](../verification/README.md) record 10 policy and 11 arithmetic obligations verified with zero errors. Historical source hashes identify the production files used for those runs. They identify the tested revision before later documentation and source-comment edits.
+
+On 2026-09-23, the [architecture fixes](architecture-fixes.md) passed 44 Windows workspace tests and four documentation tests.
+The Fedora workspace passed 59 tests and four documentation tests.
+Formatting, strict Clippy, real software-TPM tests, and six explicit LUKS regression tests passed.
+The [architecture proof record](../verification/review-fixes.json) reports 11 policy and 11 arithmetic obligations verified with zero errors for that earlier source.
+The new policy obligation checks that copying a compiled gate preserves its contents.
+
+The [Fedora review-fix run](fedora-review-fixes-test-report.md) passed with the updated binaries.
+It checked automatic data-volume unlock after reboot, worker readiness, UID separation, and timeout during DNS failure.
+A second enrollment on the virtual block device preserved the original slots, token, recovery credential, and filesystem marker.
+Repeated resume operations did not change metadata.
+Outage, wrong trust, token mutation, and changed PCR11 still caused automatic unlock to fail.
 
 Adversarial engine tests cover envelope-byte mutation before provider I/O, threshold outages, invalid payload authentication, and missing live authorization. They also cover unsupported-mode rejection before provider I/O.
 
 These results are not an independent audit or a whole-system proof.
 
 The repository provides a GitHub Actions workflow to repeat these checks. The workflow has not run on a hosted runner in this session.
+
+The later [comparison lessons](comparison-lessons.md) add operation ownership,
+compilation certificates, arithmetic and release proofs, a complete frozen
+protocol fixture, parser fuzzing, persistence fault tests, and dependency checks.
+The [current proof record](../verification/assurance-upgrades.json) reports
+28 policy, 38 sharing-arithmetic, and 8 release obligations with zero errors.
+Read the [proof scope](../verification/README.md) before interpreting these counts.

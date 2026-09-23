@@ -5,6 +5,7 @@
 //! Its private wrappers do not expose the upstream library implementations of `Debug`, `Clone`, or general-purpose serialization.
 
 mod aead;
+mod operation_rng;
 mod signing;
 mod voprf;
 

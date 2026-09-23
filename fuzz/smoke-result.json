@@ -1,0 +1,34 @@
+{
+  "checked_at_utc": "2026-09-23T09:16:40Z",
+  "platform": "Ubuntu-24.04 WSL x86_64-unknown-linux-gnu",
+  "command": "bash scripts/test-fuzz.sh",
+  "rustc": "1.100.0-nightly (1303417c4 2026-09-21)",
+  "toolchain": "nightly-2026-09-22",
+  "cargo_fuzz": "0.13.2",
+  "libfuzzer_sys": "0.4.13",
+  "sanitizer": "address",
+  "seed": 1,
+  "max_total_time_per_target_seconds": 10,
+  "runs_limit_per_target": 2000,
+  "targets": {
+    "envelope": { "runs": 2000, "coverage_counter": 1669, "features": 3079, "crashes": 0 },
+    "wire": { "runs": 2000, "coverage_counter": 41, "features": 42, "crashes": 0 },
+    "crypto_encodings": { "runs": 2000, "coverage_counter": 282, "features": 425, "crashes": 0 },
+    "luks_token": { "runs": 2000, "coverage_counter": 567, "features": 878, "crashes": 0 },
+    "policy": { "runs": 2000, "coverage_counter": 541, "features": 1088, "crashes": 0 }
+  },
+  "source_sha256": {
+    "fuzz/src/lib.rs": "9e82e2b37b4509a6dcb56cf6bb9289f7b67e73b265d3883171c234b60ef2dfff",
+    "fuzz/Cargo.lock": "c889ee9aec6b2942a84bcc81a49d20bd8eafedb17da2df22d15965d21657826a"
+  },
+  "regression_tests": "Shared deterministic corpus/mutation/boundary/generated-input harness passed on Windows and Linux.",
+  "dependency_policy": "cargo-deny 0.19.4 passed advisories, bans, licenses, and sources for the enabled fuzz graph; no advisory exceptions.",
+  "rustsec_database_revision": "6477ec04375b913e13f38d966dc49eba9d178cb8",
+  "final_script_recheck": "Offline build and unchanged-lockfile guards passed a subsequent 100-run replay of all five targets.",
+  "local_logs_sha256": {
+    ".tools/fuzz-smoke.log": "d4c04281471d9e05eb2ea5c677c271628c2ef0644625fe211d2fdbf111c1638a",
+    ".tools/fuzz-smoke-script-recheck.log": "f2f7e4b133ebdb09d892a778b2f996e5415c4d551c14474f5baf4ef05b7b7a27",
+    ".tools/dependency-policy-final.log": "12d9f8ad3443c59552fef681f766d83798ab296da6db1112176a89b91abcdd98"
+  },
+  "limitations": "Coverage counters are libFuzzer feedback, not source-coverage percentages. A 10,000-input smoke run is not an exhaustive campaign or a security proof. No TPM, disk, FFI operation, network, or cryptographic security claim is made."
+}

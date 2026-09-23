@@ -4,9 +4,32 @@ use vstd::prelude::*;
 
 verus! {
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Gate {
     Leaf { response_index: usize },
     Threshold { required: usize, children: Vec<usize> },
+}
+
+impl Clone for Gate {
+    fn clone(&self) -> (result: Self)
+        ensures
+            match (self, &result) {
+                (Gate::Leaf { response_index: original }, Gate::Leaf { response_index: copied }) =>
+                    original == copied,
+                (Gate::Threshold { required: original, children: original_children },
+                 Gate::Threshold { required: copied, children: copied_children }) =>
+                    original == copied && original_children@ == copied_children@,
+                _ => false,
+            },
+    {
+        match self {
+            Self::Leaf { response_index } => Self::Leaf { response_index: *response_index },
+            Self::Threshold { required, children } => Self::Threshold {
+                required: *required,
+                children: children.clone(),
+            },
+        }
+    }
 }
 
 pub open spec fn count_selected(children: Seq<usize>, values: Seq<bool>, n: nat) -> nat

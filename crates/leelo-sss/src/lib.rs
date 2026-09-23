@@ -6,7 +6,8 @@
 //! Consistency checks on extra shares detect some corruption. They do not establish authenticity.
 //!
 //! A Verus refinement proof checks the production field multiplier against polynomial multiplication modulo 0x11b.
-//! Tests cover all field inversions.
+//! Verus also proves nonzero inversion, executable polynomial evaluation and interpolation,
+//! and the bytewise reconstruction identity for the mandatory 2-of-2 root.
 //! These checks are not a complete Shamir secrecy proof or constant-time audit.
 //! The RNG must be an initialized cryptographic generator that operates correctly.
 //! Trait bounds cannot establish these RNG properties.
@@ -24,6 +25,7 @@
 #![forbid(unsafe_code)]
 
 mod gf256;
+mod interpolation;
 
 use core::fmt;
 use rand_core::{CryptoRng, RngCore};
@@ -142,13 +144,8 @@ pub fn split<R: CryptoRng + RngCore + ?Sized>(
         rng.try_fill_bytes(&mut coefficients[..degree])
             .map_err(|_| Error::EntropyUnavailable)?;
         for share in &mut shares {
-            // Horner's rule intentionally multiplies zero first.
-            // This keeps the same public loop shape for each coefficient.
-            let mut value = 0;
-            for coefficient in coefficients[..degree].iter().rev() {
-                value = gf256::mul(value, share.index) ^ coefficient;
-            }
-            share.value[byte] = gf256::mul(value, share.index) ^ secret_byte;
+            share.value[byte] =
+                interpolation::evaluate(*secret_byte, &coefficients[..degree], share.index);
         }
     }
     Ok(shares)
@@ -159,30 +156,19 @@ pub fn split<R: CryptoRng + RngCore + ?Sized>(
 /// Validation has already checked that each coordinate is different from all other coordinates.
 /// Thus, each denominator is nonzero. All values in this function are public.
 fn weights(shares: &[Share], target: u8) -> Vec<u8> {
-    shares
-        .iter()
-        .enumerate()
-        .map(|(i, share)| {
-            let mut numerator = 1;
-            let mut denominator = 1;
-            for (j, other) in shares.iter().enumerate() {
-                if i != j {
-                    numerator = gf256::mul(numerator, target ^ other.index);
-                    denominator = gf256::mul(denominator, share.index ^ other.index);
-                }
-            }
-            gf256::mul(numerator, gf256::inverse_nonzero(denominator))
-        })
-        .collect()
+    let indices: Vec<u8> = shares.iter().map(Share::index).collect();
+    interpolation::weights(&indices, target)
 }
 
 fn interpolate(shares: &[Share], target: u8) -> Zeroizing<[u8; SECRET_LEN]> {
     let coefficients = weights(shares, target);
     let mut result = Zeroizing::new([0; SECRET_LEN]);
-    for (share, coefficient) in shares.iter().zip(coefficients) {
-        for byte in 0..SECRET_LEN {
-            result[byte] ^= gf256::mul(share.value[byte], coefficient);
+    let mut values = Zeroizing::new([0u8; MAX_SHARES as usize]);
+    for byte in 0..SECRET_LEN {
+        for (value, share) in values.iter_mut().zip(shares) {
+            *value = share.value[byte];
         }
+        result[byte] = interpolation::weighted_sum(&values[..shares.len()], &coefficients);
     }
     result
 }

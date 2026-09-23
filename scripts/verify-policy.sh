@@ -25,7 +25,8 @@ version_output="$($verus_exe --version)"
 [[ "$version_output" == *"$verus_version"* ]] || { echo 'Wrong verifier version.' >&2; exit 1; }
 printf '%s\n' "$version_output"
 if grep -En '\b(assume|admit)\s*\(|external_body|assume_specification|verifier::external' \
-    "$leelo_root/verification/policy.rs" "$leelo_root/crates/leelo-policy/src/verified.rs"; then
+    "$leelo_root/verification/policy.rs" "$leelo_root/crates/leelo-policy/src/verified.rs" \
+    "$leelo_root/crates/leelo-policy/src/verified_compile.rs"; then
     echo 'Unreviewed local proof bypass found.' >&2
     exit 1
 fi
