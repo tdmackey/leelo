@@ -1,0 +1,23 @@
+[package]
+name = "leelo-tpm"
+version = "0.1.0"
+edition = "2024"
+rust-version.workspace = true
+description = "TPM2-TSS backend for Leelo measured-boot seed sealing"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+leelo-engine = { path = "../leelo-engine" }
+leelo-envelope = { path = "../leelo-envelope" }
+leelo-policy = { path = "../leelo-policy" }
+zeroize = "1.8"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tss-esapi = "=7.6.0"
+sha2 = "0.10"
+
+[dev-dependencies]
+leelo-crypto = { path = "../leelo-crypto" }
+
+[lints.rust]
+unsafe_code = "forbid"

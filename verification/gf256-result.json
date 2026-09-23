@@ -1,0 +1,17 @@
+{
+  "command": "verus --edition=2024 verification/gf256.rs --rlimit 15 --no-cheating",
+  "verifier": "0.2026.06.28.1847ab3",
+  "toolchain": "1.96.0-x86_64-pc-windows-msvc",
+  "exit_code": 0,
+  "output": "verification results:: 11 verified, 0 errors",
+  "source_sha256": {
+    "crates/leelo-sss/src/gf256.rs": "48fee3530429a879a9b2fba42af65bccfecc8fc9268c39f1d83c4f3ab9f855a1",
+    "verification/gf256.rs": "cdf68ea77dbcbdcec7ba4909610f8325ae572c5cd49b6374228abe22f05c8d84"
+  },
+  "runtime_tests": {
+    "field_arithmetic": "3 passed, including 65536 products and 255 inverses",
+    "sharing_integration": "8 passed",
+    "compile_fail_secret_types": "2 passed"
+  },
+  "limitations": "The proof establishes that the production multiplier agrees with polynomial arithmetic. Tests cover every nonzero input for multiplicative inversion. No formal inverse postcondition exists. The proof does not cover full Shamir interpolation or secrecy."
+}

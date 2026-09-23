@@ -1,0 +1,19 @@
+[package]
+name = "leelo-sss"
+version = "0.1.0"
+edition = "2024"
+rust-version.workspace = true
+description = "Bounded bytewise Shamir sharing for Leelo policy secrets"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+rand_core = "0.6"
+zeroize = "1.8"
+vstd = "=0.0.0-2026-06-14-0213"
+
+[dev-dependencies]
+rand_chacha = "0.3"
+
+[lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(verus_keep_ghost)', 'cfg(verus_only)'] }

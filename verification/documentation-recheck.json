@@ -1,0 +1,35 @@
+{
+  "checked_at_utc": "2026-09-23T05:55:55.3042503Z",
+  "scope": "Documentation and source comments changed. Executable Rust tokens and script code match the prior baseline.",
+  "platform": "windows_x86_64",
+  "verifier": "0.2026.06.28.1847ab3",
+  "proof_toolchain": "1.96.0-x86_64-pc-windows-msvc",
+  "command": "pwsh -File scripts/verify.ps1",
+  "exit_code": 0,
+  "proof_results": [
+    "verification results:: 10 verified, 0 errors",
+    "verification results:: 11 verified, 0 errors"
+  ],
+  "source_sha256": {
+    "crates/leelo-policy/src/verified.rs": "1f784606dbd2d38020124237d7d1fa8f027fc35b1996bcb208c8b73f40b22e3f",
+    "verification/policy.rs": "2616a5af594da65256d0d621b84fbdfaaf91634ba18748a0e6ee7da5f0066592",
+    "crates/leelo-sss/src/gf256.rs": "ce4856935f1dab8f548e10e334c51b4fbc62178f9032c0e9ab446d9d9bfbff28",
+    "verification/gf256.rs": "0639d3c61450061dff48cf8c90b60912edd9aef8e95eb7a66d9fb58ccc0fa955"
+  },
+  "runtime_tests": {
+    "command": "cargo test --workspace --locked",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "exit_code": 0,
+    "result": "35 unit and integration tests passed. Four compile-fail documentation tests passed."
+  },
+  "formatting": {
+    "command": "cargo fmt --all -- --check",
+    "exit_code": 0
+  },
+  "limitations": "Read verification/README.md for proof limits. This run does not repeat the Linux TPM, LUKS, or Fedora VM integration tests. Historical records retain their original source hashes.",
+  "documentation_build": {
+    "command": "cargo doc --workspace --no-deps --locked",
+    "rustdoc_flags": "-D warnings",
+    "exit_code": 0
+  }
+}

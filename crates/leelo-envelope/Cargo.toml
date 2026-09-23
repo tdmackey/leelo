@@ -1,0 +1,13 @@
+[package]
+name = "leelo-envelope"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+leelo-policy = { path = "../leelo-policy" }
+leelo-crypto = { path = "../leelo-crypto" }
+minicbor = { version = "0.26", features = ["std"] }
+sha2 = "0.10"
+zeroize = "1.8"

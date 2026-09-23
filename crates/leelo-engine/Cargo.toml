@@ -1,0 +1,14 @@
+[package]
+name = "leelo-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+leelo-policy = { path = "../leelo-policy" }
+leelo-crypto = { path = "../leelo-crypto" }
+leelo-sss = { path = "../leelo-sss" }
+leelo-envelope = { path = "../leelo-envelope" }
+rand_core = { version = "0.6", features = ["getrandom"] }
+zeroize = "1.8"

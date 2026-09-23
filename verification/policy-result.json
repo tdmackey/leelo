@@ -1,0 +1,13 @@
+{
+  "command": "verus --edition=2024 verification/policy.rs --rlimit 40 --no-cheating",
+  "verifier": "0.2026.06.28.1847ab3",
+  "toolchain": "1.96.0-x86_64-pc-windows-msvc",
+  "exit_code": 0,
+  "output": "verification results:: 10 verified, 0 errors",
+  "source_sha256": {
+    "crates/leelo-policy/src/verified.rs": "9483f19651c9bd7e14cff990fab399a5359a1584a79c5a9fd43a498e4b95dfad",
+    "verification/policy.rs": "8df43797a2c23226f12da402402b3aff2103068f90fcb207407246798a23bae0"
+  },
+  "runtime_tests": ["Rust 1.86.0: 6 passed", "Rust 1.95.0: 6 passed", "Rust 1.96.0: 6 passed"],
+  "limitations": "Read verification/README.md. This record describes one successful run. Run the proofs again after source changes."
+}

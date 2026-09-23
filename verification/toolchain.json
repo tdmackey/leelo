@@ -1,0 +1,9 @@
+{
+  "verus_version": "0.2026.06.28.1847ab3",
+  "verus_commit": "1847ab36fc86b09af3240e21abcbe98d6596a3fb",
+  "rust_toolchain": "1.96.0",
+  "vstd_crate": "0.0.0-2026-06-14-0213",
+  "official_release": "https://github.com/verus-lang/verus/releases/tag/release/0.2026.06.28.1847ab3",
+  "windows_x86_64_archive_sha256": "b466ff30c263f2c7ccceb2e44e994a51ed40e39cb0522fb9c4c630cb1a3f0a28",
+  "linux_x86_64_archive_sha256": "b12a622a2f44c31e72a459fc8b764e8d4bd2275e54995d21c405771b316a81e7"
+}

@@ -1,0 +1,12 @@
+[package]
+name = "leelo-policy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+vstd = "=0.0.0-2026-06-14-0213"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(verus_keep_ghost)', 'cfg(verus_only)'] }
