@@ -1,0 +1,57 @@
+{
+  "sources": [
+    {
+      "source": "verification/policy.rs",
+      "sha256": "f78508b2fc001fe83dfde8152c9c824598a40a87a24a3325825701d6478eb197"
+    },
+    {
+      "source": "verification/sss.rs",
+      "sha256": "4326cb8997645929f0d645aab59edda84db9ca52a5b1f3fc7e833612869cfdb3"
+    },
+    {
+      "source": "verification/release.rs",
+      "sha256": "84f4ba48aaa5d847f49aca5af1bcbb62b189dbe6dc65f8737b95d88f2be83308"
+    },
+    {
+      "source": "crates/leelo-policy/src/verified.rs",
+      "sha256": "7b5ace310c54092ad36e1e12fd3233172fa8d6575b3448e0ed42cc2fe820737d"
+    },
+    {
+      "source": "crates/leelo-policy/src/verified_compile.rs",
+      "sha256": "4da40bf8e976e0e975833f2f24cb6c33d326dde7d1c9f48b3f4ae7ac33d4ed50"
+    },
+    {
+      "source": "crates/leelo-sss/src/gf256.rs",
+      "sha256": "3814c411f859d20d4481065f3bdd9055ce693e5e34150b7782042341d5cfbdbb"
+    },
+    {
+      "source": "crates/leelo-sss/src/interpolation.rs",
+      "sha256": "6cc768ca21fa8119b95b69bc4b9868e3d4ea2bd84e8d277d65f15b0b099c1577"
+    },
+    {
+      "source": "crates/leelo-engine/src/release.rs",
+      "sha256": "4074e9747f0e7e5073c66073dc5b7a7803c8051eca87073a57f8ac53270d5740"
+    }
+  ],
+  "checked_at_utc": "2026-09-23T09:14:31.3409841Z",
+  "command": "pwsh -File scripts/verify.ps1",
+  "platform": "windows_x86_64",
+  "verus": "0.2026.06.28.1847ab3",
+  "proof_toolchain": "1.96.0-x86_64-pc-windows-msvc",
+  "no_cheating": true,
+  "results": {
+    "policy": {
+      "verified": 28,
+      "errors": 0
+    },
+    "sharing_arithmetic": {
+      "verified": 38,
+      "errors": 0
+    },
+    "context_release": {
+      "verified": 8,
+      "errors": 0
+    }
+  },
+  "scope": "Production decision contracts and source-to-plan semantic certificate; GF(256) multiplication/inversion and interpolation kernels; mandatory 2-of-2 root recovery; exact-context ordered single release. No general t-of-n reconstruction, probabilistic secrecy, cryptographic composition, TPM/FFI, clock, zeroization, constant-time, or whole-system proof."
+}

@@ -1,0 +1,33 @@
+[Unit]
+Description=Leelo network-bound TLS frontend
+Requires=leelo-key.service
+After=network.target leelo-key.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+TimeoutStartSec=30
+User=leelo-http
+Group=leelo-ipc
+ExecStart=/usr/local/bin/leelod serve --listen 0.0.0.0:8443 --cert /etc/leelo-http/server.crt --tls-key /etc/leelo-http/server.key --worker-socket /run/leelo-key/evaluator.sock
+UMask=0077
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=/var/lib/leelo-key
+CapabilityBoundingSet=
+LimitCORE=0
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

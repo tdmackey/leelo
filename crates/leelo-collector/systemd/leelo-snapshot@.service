@@ -1,0 +1,25 @@
+[Unit]
+Description=Leelo %i aggregate metrics snapshot
+
+[Service]
+Type=oneshot
+User=leelo-collector
+Group=leelo-observe
+EnvironmentFile=/etc/leelo-observe/%i.env
+StateDirectory=leelo-observe
+StateDirectoryMode=0750
+ExecStart=/usr/local/bin/leelo-collector snapshot --socket ${LEELO_SNAPSHOT_SOCKET} --server-uid ${LEELO_SERVER_UID} --role ${LEELO_SNAPSHOT_ROLE} --output /var/lib/leelo-observe/%i.prom
+TimeoutStartSec=2s
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+InaccessiblePaths=-/var/lib/leelo-key -/etc/leelo-http
+CapabilityBoundingSet=
+LimitCORE=0
+MemoryMax=64M
+TasksMax=8

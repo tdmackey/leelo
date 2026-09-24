@@ -1,0 +1,21 @@
+name: Parser fuzz smoke
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  parsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang libcryptsetup-dev
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - run: rustup toolchain install nightly-2026-09-22 --profile minimal
+      - run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - run: bash scripts/test-fuzz.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: parser-fuzz-reproducers
+          path: fuzz/artifacts/
+          if-no-files-found: ignore

@@ -1,0 +1,7 @@
+Use case: logo-brand.
+Asset type: an original mascot illustration for Leelo, a Rust disk-encryption security project named after the Fifth Element multipass reference.
+Primary request: a cute little Leelo mascot that is so ridiculously adorable it would inspire absolutely no confidence in a serious security product.
+Subject: one tiny, round, fluffy alien dumpling with a little orange hair tuft, huge innocent shiny eyes, blush cheeks, tiny feet and stubby paws. An endearingly vacant, extremely pleased little face. It proudly hugs an oversized access badge as if that is its entire qualification to protect your secrets. The badge is nearly as big as the creature.
+Text: only "MULTIPASS" on the badge, in clear readable uppercase letters. A small portrait of the same creature appears on its badge.
+Style: beautifully drawn 2D character illustration, soft rounded shapes, warm delicate outlines, a little plush texture, restrained soft shading. Strong simple silhouette suitable for a project mascot or sticker. Charming and memorable, not a generic corporate security logo. Extremely cute, mildly silly, harmless-looking.
+Composition: single full-body character centered, generous clear margin, square image. Transparent background with a clean alpha edge. No scene, no surrounding objects, no frame, no watermark, no other text.
